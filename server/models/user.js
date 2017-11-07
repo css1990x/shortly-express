@@ -1,6 +1,7 @@
 const utils = require('../lib/hashUtils');
 const Model = require('./model');
 
+
 /**
  * Users is a class with methods to interact with the users table, which
  * stores information (id, username, hashed password, salt) about users.
@@ -47,3 +48,7 @@ class Users extends Model {
 }
 
 module.exports = new Users();
+
+
+
+

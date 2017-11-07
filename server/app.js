@@ -5,9 +5,12 @@ const partials = require('express-partials');
 const bodyParser = require('body-parser');
 const Auth = require('./middleware/auth');
 const models = require('./models');
+const db = require('./db');
+
 
 const app = express();
 
+// ?? dubayouTF mate ?? // 
 app.set('views', `${__dirname}/views`);
 app.set('view engine', 'ejs');
 app.use(partials());
@@ -15,12 +18,17 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, '../public')));
 
-
-
 app.get('/', 
 (req, res) => {
-  res.render('index');
+  res.render('login');
+  
 });
+
+app.get('/signup', 
+(req, res) => {
+  res.render('signup');
+});
+
 
 app.get('/create', 
 (req, res) => {
@@ -78,6 +86,31 @@ app.post('/links',
 // Write your authentication routes here
 /************************************************************/
 
+app.post('/login', (req, res, next) => {
+  console.log('/LOGIN: post request');
+  
+  // grab database pass and salt
+  // var queryStr = `SELECT password, salt FROM users WHERE username = ${req.body.username}`;
+  var queryStr = 'SELECT users.password, users.salt FROM users WHERE users.username = ${req.body.username}';
+  db.query(queryStr, function(err, results) {
+    models.Users.compare(req.body.password, results[0].password, results[0].salt);
+  });
+  // call compare function in models users and pass in 
+  res.end();
+});
+
+app.post('/signup', (req, res, next) => {
+  console.log('/SIGNUP: post request');
+  
+  models.Users.create(req.body);
+  // FOR NOW //
+  // if user exists
+  // redirect to login page
+  // else 
+  // end
+
+  res.end();
+});
 
 
 /************************************************************/
