@@ -1,22 +1,15 @@
 const models = require('../models');
-const auth = require('tokens');
-const hashAuthToken = require('hash-auth-token'); 
 const Promise = require('bluebird');
 
 module.exports.createSession = (req, res, next) => {
-
-  auth.createSession(function (response) {
-    // console.log('sessionToken      : %s', response.sessionToken);
-    // console.log('nonce             : %s', response.nonce);
-    // console.log('expirationDateTime: %s', response.expirationDateTime);
-    console.log('sessionToken      : %s', hashAuthToken.generate({username: res.body.username}));
-    console.log('nonce             : %s', res.nonce);
-    console.log('expirationDateTime: %s', res.expirationDateTime);
-    next();  
-  },
-  function(error) {
-    console.log('error message: %s', error.message);
-  });
+  // authenticate session
+  models.Sessions.isLoggedIn(req.session);
+  next(); 
+  // we need to check if the person is logged in first,
+  // if yes, direct to webisite, 
+  // if not, direct to login page 
+  // CREATE SESSION itself, on the other hand, could just be used to store 
+  
 };
 
 /************************************************************/

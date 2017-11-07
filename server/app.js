@@ -89,20 +89,27 @@ app.post('/links',
 app.post('/login', (req, res, next) => {
   console.log('/LOGIN: post request');
   
-  // grab database pass and salt
-  // var queryStr = `SELECT password, salt FROM users WHERE username = ${req.body.username}`;
   var queryStr = 'SELECT users.password, users.salt FROM users WHERE users.username = ${req.body.username}';
-  db.query(queryStr, function(err, results) {
+  db.queryAsync(queryStr, function(err, results) {
     models.Users.compare(req.body.password, results[0].password, results[0].salt);
   });
-  // call compare function in models users and pass in 
+  
+  // if success, 
+    //.then to generate access token
+     
+    // store access token/session_id to database
+    // sign session id
+    // nodeCookie.create(res, user, username, secretCode(token?));
+    // append cookie w/token to response message (be sure to add expiration time to session)
   res.end();
 });
 
 app.post('/signup', (req, res, next) => {
   console.log('/SIGNUP: post request');
-  
+
+  // RETURNED: PROMISE OBJECT  
   models.Users.create(req.body);
+
   // FOR NOW //
   // if user exists
   // redirect to login page
