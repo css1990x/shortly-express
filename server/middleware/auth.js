@@ -3,8 +3,7 @@ const Promise = require('bluebird');
 
 module.exports.createSession = (req, res, next) => {
   // authenticate session
-  models.Sessions.isLoggedIn(req.session);
-  next(); 
+  
   // we need to check if the person is logged in first,
   // if yes, direct to webisite, 
   // if not, direct to login page 

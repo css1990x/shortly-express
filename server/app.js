@@ -18,11 +18,24 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, '../public')));
 
-app.get('/', 
-(req, res) => {
-  res.render('login');
-  
+
+app.get('/', (req, res) => {
+// this if stmt is used because req doesn't have session prop yet
+  if (!req.session) {
+    res.redirect('login'); 
+    res.end(); 
+// would be correct if stmt when req.session exists
+  } else if (models.Sessions.isLoggedIn(req.session)) {
+    res.render('index');
+  } else {
+    res.redirect('login');
+  }
 });
+
+app.get('/login', (req, res) => {
+  res.render('login');
+});
+
 
 app.get('/signup', 
 (req, res) => {
@@ -34,6 +47,12 @@ app.get('/create',
 (req, res) => {
   res.render('index');
 });
+
+app.get('/index', 
+(req, res) => {
+  res.render('index');
+});
+
 
 app.get('/links', 
 (req, res, next) => {
@@ -86,22 +105,51 @@ app.post('/links',
 // Write your authentication routes here
 /************************************************************/
 
+const executeQuery = (query, values) => {
+  return db.queryAsync(query, values).spread(results => results);
+};
+
 app.post('/login', (req, res, next) => {
-  console.log('/LOGIN: post request');
-  
-  var queryStr = 'SELECT users.password, users.salt FROM users WHERE users.username = ${req.body.username}';
-  db.queryAsync(queryStr, function(err, results) {
-    models.Users.compare(req.body.password, results[0].password, results[0].salt);
-  });
-  
-  // if success, 
-    //.then to generate access token
+  console.log('inside /LOGIN: post request');
+  console.log('username:', req.body.username);
+
+  // authenticate password
+  var queryStr = 'SELECT password, salt FROM users WHERE username = ?';
+  var params = [req.body.username]; 
+
+  db.query(queryStr, params, (err, results) => {
+    console.log('inside database Query');
+    console.log('results: ', results);
+    
+    var isAuthenticated = models.Users.compare(req.body.password, results[0].password, results[0].salt);
+    
+    if (isAuthenticated) { // if authenticated
+
+      // create new session w/ user_id
+      return models.Sessions.create()
+        .then(() => {
+
+          // let queryString = `INSERT INTO ${this.tablename} SET ?`;
+          // db.queryAsync(queryString, params);
      
-    // store access token/session_id to database
-    // sign session id
-    // nodeCookie.create(res, user, username, secretCode(token?));
-    // append cookie w/token to response message (be sure to add expiration time to session)
-  res.end();
+          // GET the userId associated with session 
+          // GET user profile for this userId
+          // user.models.get(USER'S SHORTLY PAGE);
+
+          // redirect to shortly page
+          console.log('inside authentication Promise'); 
+          // return app.sendRedirect(res, USERSPECIFICSHORTLYPAGE, 302);
+          return res.redirect('index');
+        })
+        .catch((err) => {
+          throw err;
+        });
+    } else { // if not authentic 
+      console.log('NOT authentic: inside redirect to login');
+      // redirect back to login page
+      res.redirect('login');
+    }
+  });
 });
 
 app.post('/signup', (req, res, next) => {
@@ -109,14 +157,18 @@ app.post('/signup', (req, res, next) => {
 
   // RETURNED: PROMISE OBJECT  
   models.Users.create(req.body);
-
-  // FOR NOW //
-  // if user exists
-  // redirect to login page
-  // else 
-  // end
-
-  res.end();
+  return models.Sessions.create()
+    .then(() => {
+      // user.models.get(USER'S SHORTLY PAGE);
+    
+      // redirect to shortly page
+      console.log('inside authentication Promise'); 
+      // return app.sendRedirect(res, USERSPECIFICSHORTLYPAGE, 302);
+      return res.redirect('index');
+    })
+    .catch((err) => {
+      throw err;
+    });
 });
 
 
