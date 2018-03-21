@@ -5,7 +5,7 @@ const partials = require('express-partials');
 const bodyParser = require('body-parser');
 const Auth = require('./middleware/auth');
 const models = require('./models');
-const db = require('./db');
+// const db = require('./db'); -- uncomment if needed
 
 
 const app = express();
@@ -18,28 +18,12 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, '../public')));
 
+app.use(require('./middleware/cookieParser'));
+app.use(Auth.createSession); 
 
-app.get('/', (req, res) => {
+app.get('/', Auth.verifySession, (req, res) => {
 // this if stmt is used because req doesn't have session prop yet
-  if (!req.session) {
-    res.redirect('login'); 
-    res.end(); 
-// would be correct if stmt when req.session exists
-  } else if (models.Sessions.isLoggedIn(req.session)) {
-    res.render('index');
-  } else {
-    res.redirect('login');
-  }
-});
-
-app.get('/login', (req, res) => {
-  res.render('login');
-});
-
-
-app.get('/signup', 
-(req, res) => {
-  res.render('signup');
+  res.render('index'); 
 });
 
 
@@ -54,7 +38,7 @@ app.get('/index',
 });
 
 
-app.get('/links', 
+app.get('/links', Auth.verifySession,
 (req, res, next) => {
   models.Links.getAll()
     .then(links => {
@@ -65,7 +49,7 @@ app.get('/links',
     });
 });
 
-app.post('/links', 
+app.post('/links', Auth.verifySession,
 (req, res, next) => {
   var url = req.body.url;
   if (!models.Links.isValidUrl(url)) {
@@ -104,71 +88,72 @@ app.post('/links',
 /************************************************************/
 // Write your authentication routes here
 /************************************************************/
-
-const executeQuery = (query, values) => {
-  return db.queryAsync(query, values).spread(results => results);
-};
+app.get('/login', (req, res) => {
+  res.render('login');
+});
 
 app.post('/login', (req, res, next) => {
-  console.log('inside /LOGIN: post request');
-  console.log('username:', req.body.username);
+  var username = req.body.username; 
+  ver password = req.body.password; 
 
   // authenticate password
   var queryStr = 'SELECT password, salt FROM users WHERE username = ?';
   var params = [req.body.username]; 
 
-  db.query(queryStr, params, (err, results) => {
-    console.log('inside database Query');
-    console.log('results: ', results);
-    
-    var isAuthenticated = models.Users.compare(req.body.password, results[0].password, results[0].salt);
-    
-    if (isAuthenticated) { // if authenticated
-
-      // create new session w/ user_id
-      return models.Sessions.create()
-        .then(() => {
-
-          // let queryString = `INSERT INTO ${this.tablename} SET ?`;
-          // db.queryAsync(queryString, params);
-     
-          // GET the userId associated with session 
-          // GET user profile for this userId
-          // user.models.get(USER'S SHORTLY PAGE);
-
-          // redirect to shortly page
-          console.log('inside authentication Promise'); 
-          // return app.sendRedirect(res, USERSPECIFICSHORTLYPAGE, 302);
-          return res.redirect('index');
-        })
-        .catch((err) => {
-          throw err;
-        });
-    } else { // if not authentic 
-      console.log('NOT authentic: inside redirect to login');
-      // redirect back to login page
-      res.redirect('login');
-    }
-  });
+  return models.Users.get({ username })
+    .then(user => {
+      if (!user || !models.Users.compare(password, user.password, user.salt)) {
+        throw new Error('username and password do not match'); 
+      }
+      return models.Sessions.update({ hash: req.session.hash}, {userId: user.id}); 
+    })
+    .then(() => {
+      res.redirect('/');
+    })
+    .error(error => {
+      res.status(500).send(error); 
+    })
+    .catch(() => {
+      res.redirect('/login'); 
+    })
 });
+
+app.get('/logout', (req, res, next) => {
+
+  return models.Sessions.delete({ hash : req.cookies.shortlyId})
+    .then(() => {
+      res.clearCookie('shortlyId');
+      res.redirect('/login'); 
+    });
+});
+
+app.get('/signup', (req, res) => {
+  res.render('signup'); 
+})
 
 app.post('/signup', (req, res, next) => {
   console.log('/SIGNUP: post request');
-
-  // RETURNED: PROMISE OBJECT  
-  models.Users.create(req.body);
-  return models.Sessions.create()
-    .then(() => {
-      // user.models.get(USER'S SHORTLY PAGE);
-    
-      // redirect to shortly page
-      console.log('inside authentication Promise'); 
-      // return app.sendRedirect(res, USERSPECIFICSHORTLYPAGE, 302);
-      return res.redirect('index');
+  var username = req.body.username;
+  var password = req.body.password;
+  return models.Users.get({ username })
+    .then(user => {
+      if (user){
+        throw user; 
+      }
+      return models.Users.create({ username, password})
     })
-    .catch((err) => {
-      throw err;
-    });
+    .then(results => {
+      return models.Sessions.update({ hash: req.session.hash}, {userId: results.insertId});
+    })
+    .then(() => {
+      res.redirect('/');
+    })
+    .error(error => {
+      res.status(500).send(error); 
+    })
+    .catch(user => {
+      res.redirect('/signup'); 
+    })
 });
 
 
